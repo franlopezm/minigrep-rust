@@ -1,75 +1,91 @@
-use std::{fs, error::Error};
+use std::{error::Error, fs};
 
 pub struct Arguments {
-  pub query: String,
-  pub file_path: String,
-  pub ignore_case: bool
+    pub query: String,
+    pub file_path: String,
+    pub ignore_case: bool,
+    pub count_line: bool,
 }
 
 impl Arguments {
-  pub fn new(args: &Vec<String>) -> Result<Self, &'static str> {
-      if args.len() < 3 {
-          return Err("not enough arguments.");
-      }
-
-      let mut args_clone = args.clone();
-      args_clone.remove(0);
-      let file_path = args_clone.pop().unwrap();
-
-      let mut query: String = String::from(""); // args[1].clone();
-      let mut ignore_case = false; // = args[2].clone();
-
-      for arg in args_clone.iter() {
-        if arg.replace("-", "") == "i" {
-          ignore_case = true;
-        } else {
-          query = arg.clone();
+    pub fn new(args: &Vec<String>) -> Result<Self, &'static str> {
+        if args.len() < 3 {
+            return Err("not enough arguments.");
         }
-      }
 
-      Ok(Self { query, file_path, ignore_case })
-  }
+        let mut args_clone = args.clone();
+
+        args_clone.remove(0); // Remove first line with program path
+        let file_path = args_clone.pop().unwrap();
+        let query = args_clone.pop().unwrap_or_default();
+
+        let mut ignore_case = false;
+        let mut count_line = false;
+
+        for arg in args_clone.iter() {
+            if arg.contains("-") {
+                if arg.contains("i") {
+                    ignore_case = true;
+                }
+
+                if arg.contains("c") {
+                    count_line = true;
+                }
+            }
+        }
+
+        Ok(Self {
+            query,
+            file_path,
+            ignore_case,
+            count_line,
+        })
+    }
 }
 
 pub fn run(args: Arguments) -> Result<(), Box<dyn Error>> {
-  let contents = fs::read_to_string(args.file_path)?;
+    let contents = fs::read_to_string(args.file_path)?;
 
-  let results = if args.ignore_case {
-    search_case_insensitive(&args.query, &contents)
-  } else {
-    search(&args.query, &contents)
-  };
+    let results = if args.ignore_case {
+        search_case_insensitive(&args.query, &contents)
+    } else {
+        search(&args.query, &contents)
+    };
 
-  for line in results {
-    println!("{line}");
-  }
+    if args.count_line {
+        println!("{}", results.len())
+    } else {
+        for line in results {
+            println!("{line}");
+        }
+    }
 
-  Ok(())
+    Ok(())
 }
 
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-  let mut results = Vec::new();
+    let mut results = Vec::new();
 
-  for line in contents.lines() {
-    if line.contains(&query) {
-      results.push(line);
+    for line in contents.lines() {
+        if line.contains(&query) {
+            results.push(line);
+        }
     }
-  }
 
-  results
+    results
 }
 
 pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-  let query = query.to_lowercase();
-  let mut result = Vec::new();
+    let query = query.to_lowercase();
+    let mut result = Vec::new();
 
-  for line in contents.lines() {
-    if line.to_lowercase().contains(&query) {
-      result.push(line);
+    for line in contents.lines() {
+        if line.to_lowercase().contains(&query) {
+            result.push(line);
+        }
     }
-  }
 
-  result
+    result
 }
 
 #[cfg(test)]
@@ -101,5 +117,4 @@ Trust me.";
             search_case_insensitive(query, contents)
         );
     }
-
 }
